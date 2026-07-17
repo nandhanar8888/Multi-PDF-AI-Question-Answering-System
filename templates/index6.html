@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Tinos&display=swap" rel="stylesheet">
+  <title>PDF Q&A App</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Tinos', serif;
+      background-color: #fafafa;
+      background-repeat: repeat;
+      background-size: auto;
+      background-attachment: fixed;
+      color: #1a1a1a;
+      display: flex;
+      height: 100vh;
+    }
+
+    .left-panel,
+    .right-panel {
+      padding: 24px;
+      overflow-y: auto;
+      background-color: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(2px);
+    }
+
+    .left-panel {
+      width: 45%;
+      border-right: 1px solid #e0e0e0;
+    }
+
+    .right-panel {
+      width: 55%;
+    }
+
+    h2, h3 {
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+
+    form {
+      margin-bottom: 24px;
+    }
+
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dcdcdc;
+      border-radius: 4px;
+      font-size: 14px;
+      background-color: #fff;
+      margin-top: 6px;
+    }
+
+    textarea {
+      height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      background-color: #000000;
+      color: #ffffff;
+      border: none;
+      padding: 10px 16px;
+      font-size: 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #333333;
+    }
+
+    .pdf-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .pdf-list form {
+      margin-bottom: 8px;
+    }
+
+    .pdf-list button {
+      width: 100%;
+      background-color: #ffffff;
+      color: #000000;
+      border: 1px solid #dcdcdc;
+      padding: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      text-align: left;
+      transition: all 0.2s;
+    }
+
+    .pdf-list button:hover {
+      background-color: #f2f2f2;
+    }
+
+    .result {
+      margin-top: 20px;
+      white-space: pre-wrap;
+      background: #f7f7f7;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+    }
+
+    iframe {
+      width: 100%;
+      height: 90vh;
+      border: 1px solid #dcdcdc;
+      border-radius: 4px;
+      background-color: white;
+    }
+
+    p {
+      color: #6b6b6b;
+      font-size: 14px;
+    }
+
+    #popup {
+      display: none;
+      position: fixed;
+      top: 10%;
+      left: 0%;
+      width: 45%;
+      height: 40%;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 2px solid #000000;
+      padding: 20px;
+      z-index: 1000;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
+    #popup ul li {
+      margin-bottom: 12px;
+    }
+
+    #popup ul li a {
+      color: blue;
+      cursor: pointer;
+    }
+
+    /* ✅ Inline Loader */
+    #inline-loader {
+      display: none;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="left-panel">
+    <h2>Upload PDF</h2>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="file" name="pdf" required>
+      <button type="submit">Upload</button>
+    </form>
+
+    <h2>Available PDFs</h2>
+    <div class="pdf-list">
+      {% for pdf in pdfs %}
+      <form method="POST">
+        <input type="hidden" name="selected_pdf" value="{{ pdf }}">
+        <button type="submit">{{ pdf }}</button>
+      </form>
+      {% endfor %}
+    </div>
+
+    <h3>Ask a Question</h3>
+    <form method="POST">
+      <input type="hidden" name="selected_pdf" value="{{ selected_pdf }}">
+      <label style="display: block; margin-bottom: 8px;">
+        <input type="checkbox" name="only_current_pdf" {% if request.form.get("only_current_pdf") %}checked{% endif %}>
+        Search only in currently opened PDF
+      </label>
+      <textarea name="question" placeholder="Ask a question..." required>{{ request.form.get("question", "") }}</textarea>
+      <button type="submit">Ask</button>
+
+      <!-- ✅ Inline loader appears here during processing -->
+      <div id="inline-loader">⏳ Loading answer...</div>
+    </form>
+
+    {% if result %}
+    <h3>Answer:</h3>
+    <div class="result">{{ result }}</div>
+    {% endif %}
+
+    {% if top_chunks %}
+      <button onclick="showPopup()">📁 Show Source Chunks</button>
+    {% endif %}
+  </div>
+
+  <div class="right-panel">
+    <h2>PDF Viewer</h2>
+    {% if pdf_url %}
+    <iframe id="pdfViewer" src="{{ pdf_url }}"></iframe>
+    {% else %}
+    <p>Select a PDF to view it here.</p>
+    {% endif %}
+  </div>
+
+  <div id="popup">
+    <h3>🔍 Extracted Chunks Used:</h3>
+    <ul>
+      {% for chunk in top_chunks %}
+        <li><a onclick="loadPdf('{{ chunk.pdf }}')">{{ chunk.text[:140] }}...</a></li>
+      {% endfor %}
+    </ul>
+    <button onclick="hidePopup()">❌ Close</button>
+  </div>
+
+  <script>
+    function showPopup() {
+      document.getElementById("popup").style.display = "block";
+    }
+
+    function hidePopup() {
+      document.getElementById("popup").style.display = "none";
+    }
+
+    function loadPdf(filename) {
+      const iframe = document.getElementById("pdfViewer");
+      iframe.src = "/static/uploads/" + filename;
+      hidePopup();
+    }
+
+    function disableAllButtons(disabled = true) {
+      document.querySelectorAll("button").forEach(btn => {
+        btn.disabled = disabled;
+        if (disabled) {
+          btn.style.opacity = 0.5;
+          btn.style.pointerEvents = "none";
+        } else {
+          btn.style.opacity = "";
+          btn.style.pointerEvents = "";
+        }
+      });
+    }
+
+    function showInlineLoader() {
+      document.getElementById("inline-loader").style.display = "block";
+    }
+
+    function hideInlineLoader() {
+      document.getElementById("inline-loader").style.display = "none";
+    }
+
+    // Handle form submit
+    document.querySelectorAll("form").forEach(form => {
+      form.addEventListener("submit", function (e) {
+        const textarea = form.querySelector('textarea[name="question"]');
+        if (textarea) {
+          // This is the question form
+          disableAllButtons(true);
+          showInlineLoader();
+        }
+      });
+    });
+
+    // Reset on load
+    window.addEventListener("load", () => {
+      hideInlineLoader();
+      disableAllButtons(false);
+    });
+  </script>
+</body>
+</html>
