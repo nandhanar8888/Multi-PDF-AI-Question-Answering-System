@@ -1,4 +1,4 @@
-# SmartPDF – Multi-PDF AI Question Answering System
+# Multi-PDF AI Question Answering System
 
 A Flask-based AI application that allows users to upload multiple PDF documents and ask natural language questions. The system extracts text from PDFs, retrieves the most relevant content using TF-IDF, and generates answers using the Hugging Face Inference API.
 
